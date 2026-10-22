@@ -1,8 +1,7 @@
-@"
+
 node_modules/
 .env
 .env.*
 !.env.example
 dist/
 build/
-"@ | Set-Content .gitignore
