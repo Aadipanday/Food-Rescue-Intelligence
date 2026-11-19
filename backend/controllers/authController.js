@@ -25,6 +25,25 @@ const tempCookieOptions = {
   maxAge: 15 * 60 * 1000,
 };
 
+const sanitizeUser = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  phone: user.phone,
+  role: user.role,
+  organization: user.organization,
+  volunteerDetails: user.volunteerDetails,
+  address: user.address,
+  location: user.location,
+  isVerifiedOrg: user.isVerifiedOrg,
+  impact: user.impact,
+  picture: user.picture || null,
+  googleId: user.googleId || null,
+  isEmailVerified: user.isEmailVerified,
+  isPhoneVerified: user.isPhoneVerified,
+  createdAt: user.createdAt,
+});
+
 const hashOtp = (otp) =>
   crypto.createHash("sha256").update(String(otp).trim()).digest("hex");
 
@@ -68,7 +87,7 @@ const makeTempToken = (userId, stage) =>
 // REGISTER: create an unverified account and send email OTP
 const register = async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone, role } = req.body;
 
     if (!name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({
@@ -81,6 +100,9 @@ const register = async (req, res) => {
         message: "Password must be at least 6 characters",
       });
     }
+
+    const allowedRoles = ["donor", "ngo", "volunteer"];
+    const userRole = role && allowedRoles.includes(role) ? role : "donor";
 
     const normalizedEmail = email.toLowerCase().trim();
     const existingUser = await User.findOne({ email: normalizedEmail });
@@ -100,6 +122,7 @@ const register = async (req, res) => {
       email: normalizedEmail,
       password: await bcrypt.hash(password, 12),
       phone: phone?.trim() || null,
+      role: userRole,
       isEmailVerified: false,
       emailOtp: hashOtp(otp),
       emailOtpExpires: new Date(Date.now() + 10 * 60 * 1000),
@@ -120,7 +143,7 @@ const register = async (req, res) => {
       message: "Registration created. Enter the OTP sent to your email.",
       requiresEmailVerification: true,
       tempToken,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: sanitizeUser(user),
     });
   } catch (error) {
   console.error(
@@ -294,13 +317,7 @@ const verifyEmailOtp = async (req, res) => {
 
     return res.status(200).json({
       message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        picture: user.picture || null,
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error("Verify email OTP error:", error.message);
@@ -371,13 +388,7 @@ const verifyPhoneOtp = async (req, res) => {
 
     return res.status(200).json({
       message: "Login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        picture: user.picture || null,
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error("Verify phone OTP error:", error.message);
@@ -443,13 +454,7 @@ const googleLogin = async (req, res) => {
 
     return res.status(200).json({
       message: "Google login successful",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        picture: user.picture || null,
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error("Google login error:", error.message);
@@ -471,21 +476,22 @@ const getMe = async (req, res) => ({
 
 const getMeHandler = async (req, res) => {
   return res.status(200).json({
-    user: {
-      id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-      phone: req.user.phone,
-      picture: req.user.picture || null,
-      googleId: req.user.googleId,
-      createdAt: req.user.createdAt,
-    },
+    user: sanitizeUser(req.user),
   });
 };
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, phone } = req.body;
+    const {
+      name,
+      phone,
+      role,
+      organization,
+      volunteerDetails,
+      address,
+      location,
+    } = req.body;
+
     const user = await User.findById(req.user._id);
 
     if (!user) {
@@ -495,19 +501,54 @@ const updateProfile = async (req, res) => {
     if (name && name.trim()) user.name = name.trim();
     if (phone !== undefined) user.phone = phone ? phone.trim() : null;
 
+    // Allow switching role (except to admin)
+    if (role && ["donor", "ngo", "volunteer"].includes(role)) {
+      user.role = role;
+    }
+
+    // Organization details
+    if (organization && typeof organization === "object") {
+      user.organization = {
+        name: organization.name !== undefined ? organization.name?.trim() : user.organization?.name,
+        regNumber: organization.regNumber !== undefined ? organization.regNumber?.trim() : user.organization?.regNumber,
+        orgType: organization.orgType || user.organization?.orgType || "individual",
+      };
+    }
+
+    // Volunteer details
+    if (volunteerDetails && typeof volunteerDetails === "object") {
+      user.volunteerDetails = {
+        vehicleType: volunteerDetails.vehicleType || user.volunteerDetails?.vehicleType || "none",
+        isAvailable: volunteerDetails.isAvailable !== undefined ? volunteerDetails.isAvailable : user.volunteerDetails?.isAvailable,
+      };
+    }
+
+    // Physical address
+    if (address && typeof address === "object") {
+      user.address = {
+        street: address.street !== undefined ? address.street : user.address?.street,
+        city: address.city !== undefined ? address.city : user.address?.city,
+        state: address.state !== undefined ? address.state : user.address?.state,
+        pincode: address.pincode !== undefined ? address.pincode : user.address?.pincode,
+      };
+    }
+
+    // Geolocation coordinates: expects { coordinates: [longitude, latitude] } or [longitude, latitude]
+    if (location) {
+      const coords = Array.isArray(location) ? location : location.coordinates;
+      if (Array.isArray(coords) && coords.length === 2) {
+        user.location = {
+          type: "Point",
+          coordinates: [Number(coords[0]), Number(coords[1])],
+        };
+      }
+    }
+
     await user.save();
 
     return res.status(200).json({
       message: "Profile updated successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        picture: user.picture || null,
-        googleId: user.googleId,
-        createdAt: user.createdAt,
-      },
+      user: sanitizeUser(user),
     });
   } catch (error) {
     console.error("Update profile error:", error.message);
