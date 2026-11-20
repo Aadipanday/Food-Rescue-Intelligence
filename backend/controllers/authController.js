@@ -1,4 +1,3 @@
-
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -28,26 +27,6 @@ const tempCookieOptions = {
 const hashOtp = (otp) =>
   crypto.createHash("sha256").update(String(otp).trim()).digest("hex");
 
-const sendOtpEmail = async (user, otp, purpose) => {
-  const isRegistration = purpose === "register";
-
-  await sendEmail({
-    to: user.email,
-    subject: isRegistration
-      ? "Verify your FoodRescue Intelligence account"
-      : "Your FoodRescue Intelligence login OTP",
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px">
-        <h2>FoodRescue Intelligence</h2>
-        <p>Hello ${escapeHtml(user.name)},</p>
-        <p>${isRegistration ? "Use this OTP to verify your email address:" : "Use this OTP to complete your login:"}</p>
-        <h1 style="letter-spacing:8px">${otp}</h1>
-        <p>This OTP expires in 10 minutes. Do not share it with anyone.</p>
-      </div>
-    `,
-  });
-};
-
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -58,6 +37,34 @@ function escapeHtml(value = "") {
   })[char]);
 }
 
+const sendOtpEmail = async (user, otp, purpose) => {
+  const isRegistration = purpose === "register";
+
+  await sendEmail({
+    to: user.email,
+    subject: isRegistration
+      ? "Verify your FoodRescue Intelligence account"
+      : "Your FoodRescue Intelligence login OTP",
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e0e0e0;border-radius:8px">
+        <h2 style="color:#2e7d32">FoodRescue Intelligence</h2>
+        <p>Hello <strong>${escapeHtml(user.name)}</strong>,</p>
+        <p>${
+          isRegistration
+            ? "Thank you for joining FoodRescue Intelligence! Use this OTP to verify your email address:"
+            : "Use this OTP to complete your login:"
+        }</p>
+        <div style="text-align:center;margin:24px 0">
+          <span style="font-size:32px;font-weight:bold;letter-spacing:8px;background:#f1f8e9;color:#2e7d32;padding:12px 24px;border-radius:6px;display:inline-block">${otp}</span>
+        </div>
+        <p style="color:#666">This OTP expires in 10 minutes. Do not share it with anyone.</p>
+        <hr style="border:none;border-top:1px solid #eee;margin:20px 0" />
+        <p style="font-size:12px;color:#999">FoodRescue Intelligence — Saving food, feeding lives, reducing waste.</p>
+      </div>
+    `,
+  });
+};
+
 const makeTempToken = (userId, stage) =>
   jwt.sign(
     { userId, stage },
@@ -65,19 +72,21 @@ const makeTempToken = (userId, stage) =>
     { expiresIn: "15m" }
   );
 
-// REGISTER: create an unverified account and send email OTP
+// 1. REGISTER: create an account and send email OTP (or update & resend if unverified)
 const register = async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { name, email, password, phone, role } = req.body;
 
     if (!name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({
+        success: false,
         message: "Name, email and password are required",
       });
     }
 
     if (password.length < 6) {
       return res.status(400).json({
+        success: false,
         message: "Password must be at least 6 characters",
       });
     }
@@ -85,14 +94,54 @@ const register = async (req, res) => {
     const normalizedEmail = email.toLowerCase().trim();
     const existingUser = await User.findOne({ email: normalizedEmail });
 
+    // Handle existing user
     if (existingUser) {
-      return res.status(409).json({
-        message: existingUser.isEmailVerified
-          ? "An account with this email already exists"
-          : "An unverified account already exists. Please request a new OTP or contact support.",
+      if (existingUser.isEmailVerified) {
+        return res.status(409).json({
+          success: false,
+          message: "An account with this email already exists. Please log in.",
+        });
+      }
+
+      // Existing unverified account: refresh credentials, generate fresh OTP, and send email
+      const otp = generateOtp();
+      existingUser.name = name.trim();
+      existingUser.password = await bcrypt.hash(password, 12);
+      if (phone) existingUser.phone = phone.trim();
+      if (role) existingUser.role = role.trim();
+      existingUser.emailOtp = hashOtp(otp);
+      existingUser.emailOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      existingUser.emailOtpPurpose = "register";
+      await existingUser.save();
+
+      try {
+        await sendOtpEmail(existingUser, otp, "register");
+      } catch (emailError) {
+        console.error("Register send email error:", emailError.response?.data || emailError.message);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send verification email. Please verify email address and try again.",
+        });
+      }
+
+      const tempToken = makeTempToken(existingUser._id, "email_registration_pending");
+      res.cookie("temp_token", tempToken, tempCookieOptions);
+
+      return res.status(200).json({
+        success: true,
+        message: "An unverified registration was found. A fresh verification OTP has been sent to your email.",
+        requiresEmailVerification: true,
+        tempToken,
+        user: {
+          id: existingUser._id,
+          name: existingUser.name,
+          email: existingUser.email,
+          role: existingUser.role,
+        },
       });
     }
 
+    // Create fresh user
     const otp = generateOtp();
 
     const user = await User.create({
@@ -100,6 +149,7 @@ const register = async (req, res) => {
       email: normalizedEmail,
       password: await bcrypt.hash(password, 12),
       phone: phone?.trim() || null,
+      role: role?.trim() || "user",
       isEmailVerified: false,
       emailOtp: hashOtp(otp),
       emailOtpExpires: new Date(Date.now() + 10 * 60 * 1000),
@@ -110,37 +160,96 @@ const register = async (req, res) => {
       await sendOtpEmail(user, otp, "register");
     } catch (emailError) {
       await User.findByIdAndDelete(user._id);
-      throw emailError;
+      console.error("Send OTP Email error during register:", emailError.response?.data || emailError.message);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send verification email. Please verify email address and try again.",
+      });
     }
 
     const tempToken = makeTempToken(user._id, "email_registration_pending");
     res.cookie("temp_token", tempToken, tempCookieOptions);
 
     return res.status(201).json({
-      message: "Registration created. Enter the OTP sent to your email.",
+      success: true,
+      message: "Registration successful. Please enter the OTP sent to your email.",
       requiresEmailVerification: true,
       tempToken,
-      user: { id: user._id, name: user.name, email: user.email },
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
   } catch (error) {
-  console.error(
-    "Register error:",
-    error.response?.data || error.message
-  );
-
-  return res.status(500).json({
-    message: "Registration failed. Please try again."
-  });
-}
+    console.error("Register error:", error.response?.data || error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Registration failed. Please try again.",
+    });
+  }
 };
 
-// PASSWORD LOGIN: password is checked first, then OTP is required
+// 2. RESEND VERIFICATION OTP (Can be called by email or pending session)
+const resendVerificationOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+    let user = null;
+
+    if (email) {
+      user = await User.findOne({ email: email.toLowerCase().trim() });
+    } else if (req.user?._id) {
+      user = await User.findById(req.user._id);
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User account not found with the provided email",
+      });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Your email is already verified. Please log in.",
+      });
+    }
+
+    const otp = generateOtp();
+    user.emailOtp = hashOtp(otp);
+    user.emailOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    user.emailOtpPurpose = "register";
+    await user.save();
+
+    await sendOtpEmail(user, otp, "register");
+
+    const tempToken = makeTempToken(user._id, "email_registration_pending");
+    res.cookie("temp_token", tempToken, tempCookieOptions);
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification OTP resent to your email.",
+      tempToken,
+    });
+  } catch (error) {
+    console.error("Resend OTP error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to resend verification OTP. Please try again.",
+    });
+  }
+};
+
+// 3. PASSWORD LOGIN: password is checked first, then OTP or session issued
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({
+        success: false,
         message: "Email and password are required",
       });
     }
@@ -151,22 +260,48 @@ const login = async (req, res) => {
 
     if (!user || !user.password || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({
+        success: false,
         message: "Invalid email or password",
       });
     }
 
+    // If user is unverified, send fresh OTP and provide tempToken
     if (!user.isEmailVerified) {
+      const otp = generateOtp();
+      user.emailOtp = hashOtp(otp);
+      user.emailOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+      user.emailOtpPurpose = "register";
+      await user.save();
+
+      try {
+        await sendOtpEmail(user, otp, "register");
+      } catch (err) {
+        console.error("Error sending verification OTP on login:", err.message);
+      }
+
+      const tempToken = makeTempToken(user._id, "email_registration_pending");
+      res.cookie("temp_token", tempToken, tempCookieOptions);
+
       return res.status(403).json({
-        message: "Please verify your email before logging in.",
+        success: false,
+        message: "Your email is not verified yet. A new verification OTP has been sent to your email.",
         requiresEmailVerification: true,
+        tempToken,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+        },
       });
     }
 
+    // User is verified: initiate 2FA OTP flow
     const tempToken = makeTempToken(user._id, "2fa_pending");
     res.cookie("temp_token", tempToken, tempCookieOptions);
 
     return res.status(200).json({
-      message: "Password verified. Choose Email OTP or SMS OTP.",
+      success: true,
+      message: "Password verified. Complete two-step verification via Email OTP or SMS OTP.",
       requiresOtp: true,
       tempToken,
       user: {
@@ -174,48 +309,51 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        role: user.role,
       },
     });
   } catch (error) {
     console.error("Login error:", error.message);
-    return res.status(500).json({ message: "Server error during login" });
+    return res.status(500).json({
+      success: false,
+      message: "Server error during login",
+    });
   }
 };
 
 const getPendingUser = async (req, res) => {
   return res.status(200).json({
+    success: true,
     user: {
       id: req.user._id,
       name: req.user.name,
       email: req.user.email,
       phone: req.user.phone,
+      role: req.user.role,
     },
   });
 };
 
-// Send email OTP for the login two-step verification flow
+// Send email OTP for login verification
 const sendEmailOtp = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    if (!user.isEmailVerified) {
-      return res.status(403).json({
-        message: "Verify your email before using login OTP.",
-      });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     const otp = generateOtp();
+    const isRegisterStage = req.authStage === "email_registration_pending" || !user.isEmailVerified;
+    const purpose = isRegisterStage ? "register" : "login";
+
     user.emailOtp = hashOtp(otp);
     user.emailOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
-    user.emailOtpPurpose = "login";
+    user.emailOtpPurpose = purpose;
     await user.save();
 
     try {
-      await sendOtpEmail(user, otp, "login");
+      await sendOtpEmail(user, otp, purpose);
     } catch (error) {
       user.emailOtp = null;
       user.emailOtpExpires = null;
@@ -224,42 +362,47 @@ const sendEmailOtp = async (req, res) => {
       throw error;
     }
 
-    return res.status(200).json({ message: "Email OTP sent successfully" });
+    return res.status(200).json({
+      success: true,
+      message: `Email OTP sent successfully for ${purpose}`,
+    });
   } catch (error) {
     console.error("Send email OTP error:", error.message);
     return res.status(500).json({
+      success: false,
       message: "Unable to send email OTP. Please try again.",
     });
   }
 };
 
-// Verify either registration OTP or login OTP based on its purpose
+// Verify either registration OTP or login OTP
 const verifyEmailOtp = async (req, res) => {
   try {
     const { otp } = req.body;
 
     if (!otp) {
-      return res.status(400).json({ message: "OTP is required" });
+      return res.status(400).json({ success: false, message: "OTP is required" });
     }
 
     const user = await User.findById(req.user._id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     if (!user.emailOtp || !user.emailOtpExpires) {
-      return res.status(400).json({ message: "Request a new OTP first" });
+      return res.status(400).json({ success: false, message: "Please request a new OTP first" });
     }
 
     if (user.emailOtpExpires.getTime() < Date.now()) {
       return res.status(400).json({
+        success: false,
         message: "OTP expired. Please request a new OTP.",
       });
     }
 
     if (user.emailOtp !== hashOtp(otp)) {
-      return res.status(400).json({ message: "Invalid OTP" });
+      return res.status(400).json({ success: false, message: "Invalid OTP. Please check and re-enter." });
     }
 
     const purpose = user.emailOtpPurpose;
@@ -268,20 +411,35 @@ const verifyEmailOtp = async (req, res) => {
     user.emailOtpExpires = null;
     user.emailOtpPurpose = null;
 
-    if (purpose === "register") {
+    if (purpose === "register" || !user.isEmailVerified) {
       user.isEmailVerified = true;
       await user.save();
       res.clearCookie("temp_token", tempCookieOptions);
 
+      // Issue active session token so user doesn't have to log in immediately
+      const token = generateToken(user._id);
+      res.cookie("token", token, cookieOptions);
+
       return res.status(200).json({
-        message: "Email verified successfully. You can now log in.",
+        success: true,
+        message: "Email verified successfully! You are now logged in.",
         emailVerified: true,
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone,
+          organization: user.organization || null,
+        },
       });
     }
 
     if (purpose !== "login") {
       await user.save();
       return res.status(400).json({
+        success: false,
         message: "OTP purpose is invalid. Please request a new OTP.",
       });
     }
@@ -293,32 +451,37 @@ const verifyEmailOtp = async (req, res) => {
     res.clearCookie("temp_token", tempCookieOptions);
 
     return res.status(200).json({
+      success: true,
       message: "Login successful",
+      token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
+        role: user.role,
         picture: user.picture || null,
+        organization: user.organization || null,
       },
     });
   } catch (error) {
     console.error("Verify email OTP error:", error.message);
-    return res.status(500).json({ message: "Email OTP verification failed" });
+    return res.status(500).json({ success: false, message: "Email OTP verification failed" });
   }
 };
 
-// SMS OTP for login
+// Send SMS OTP for login
 const sendPhoneOtp = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     if (!user.phone) {
       return res.status(400).json({
+        success: false,
         message: "No phone number registered. Please use Email OTP.",
       });
     }
@@ -330,35 +493,37 @@ const sendPhoneOtp = async (req, res) => {
 
     await sendSmsOtp({ phone: user.phone, otp });
 
-    return res.status(200).json({ message: "SMS OTP sent successfully" });
+    return res.status(200).json({ success: true, message: "SMS OTP sent successfully" });
   } catch (error) {
     console.error("Send phone OTP error:", error.message);
     return res.status(500).json({
+      success: false,
       message: "Unable to send SMS OTP. Please try Email OTP.",
     });
   }
 };
 
+// Verify SMS OTP for login
 const verifyPhoneOtp = async (req, res) => {
   try {
     const { otp } = req.body;
 
     if (!otp) {
-      return res.status(400).json({ message: "OTP is required" });
+      return res.status(400).json({ success: false, message: "OTP is required" });
     }
 
     const user = await User.findById(req.user._id);
 
     if (!user || !user.phoneOtp || !user.phoneOtpExpires) {
-      return res.status(400).json({ message: "Request a new SMS OTP first" });
+      return res.status(400).json({ success: false, message: "Request a new SMS OTP first" });
     }
 
     if (user.phoneOtpExpires.getTime() < Date.now()) {
-      return res.status(400).json({ message: "SMS OTP expired" });
+      return res.status(400).json({ success: false, message: "SMS OTP expired" });
     }
 
     if (user.phoneOtp !== String(otp).trim()) {
-      return res.status(400).json({ message: "Invalid SMS OTP" });
+      return res.status(400).json({ success: false, message: "Invalid SMS OTP" });
     }
 
     user.phoneOtp = null;
@@ -370,28 +535,32 @@ const verifyPhoneOtp = async (req, res) => {
     res.clearCookie("temp_token", tempCookieOptions);
 
     return res.status(200).json({
+      success: true,
       message: "Login successful",
+      token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
+        role: user.role,
         picture: user.picture || null,
+        organization: user.organization || null,
       },
     });
   } catch (error) {
     console.error("Verify phone OTP error:", error.message);
-    return res.status(500).json({ message: "SMS OTP verification failed" });
+    return res.status(500).json({ success: false, message: "SMS OTP verification failed" });
   }
 };
 
-// GOOGLE LOGIN: Google verifies the identity; no additional OTP required
+// Google OAuth Login
 const googleLogin = async (req, res) => {
   try {
     const { credential } = req.body;
 
     if (!credential) {
-      return res.status(400).json({ message: "Google credential is required" });
+      return res.status(400).json({ success: false, message: "Google credential is required" });
     }
 
     const ticket = await googleClient.verifyIdToken({
@@ -403,6 +572,7 @@ const googleLogin = async (req, res) => {
 
     if (!payload?.email || !payload.email_verified || !payload.sub) {
       return res.status(401).json({
+        success: false,
         message: "Google email could not be verified",
       });
     }
@@ -413,10 +583,10 @@ const googleLogin = async (req, res) => {
     });
 
     if (user) {
-      // Do not silently link a password account to Google.
       if (!user.googleId && user.password) {
         return res.status(409).json({
-          message: "An email/password account already exists. Log in with that account first.",
+          success: false,
+          message: "An email/password account already exists. Log in with password first.",
           accountLinkRequired: true,
         });
       }
@@ -434,6 +604,7 @@ const googleLogin = async (req, res) => {
         googleId: payload.sub,
         picture: payload.picture || null,
         isEmailVerified: true,
+        role: "user",
       });
     }
 
@@ -442,54 +613,59 @@ const googleLogin = async (req, res) => {
     res.clearCookie("temp_token", tempCookieOptions);
 
     return res.status(200).json({
+      success: true,
       message: "Google login successful",
+      token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
+        role: user.role,
         picture: user.picture || null,
+        organization: user.organization || null,
       },
     });
   } catch (error) {
     console.error("Google login error:", error.message);
-    return res.status(401).json({ message: "Google authentication failed" });
+    return res.status(401).json({ success: false, message: "Google authentication failed" });
   }
 };
 
-const getMe = async (req, res) => ({
-  user: {
-    id: req.user._id,
-    name: req.user.name,
-    email: req.user.email,
-    phone: req.user.phone,
-    picture: req.user.picture || null,
-    googleId: req.user.googleId,
-    createdAt: req.user.createdAt,
-  },
-});
-
+// Current authenticated user profile
 const getMeHandler = async (req, res) => {
-  return res.status(200).json({
-    user: {
-      id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-      phone: req.user.phone,
-      picture: req.user.picture || null,
-      googleId: req.user.googleId,
-      createdAt: req.user.createdAt,
-    },
-  });
+  try {
+    const user = await User.findById(req.user._id)
+      .select("-password")
+      .populate("organization");
+
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        picture: user.picture || null,
+        googleId: user.googleId,
+        organization: user.organization || null,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Failed to fetch profile" });
+  }
 };
 
+// Update Profile
 const updateProfile = async (req, res) => {
   try {
     const { name, phone } = req.body;
     const user = await User.findById(req.user._id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     if (name && name.trim()) user.name = name.trim();
@@ -498,31 +674,36 @@ const updateProfile = async (req, res) => {
     await user.save();
 
     return res.status(200).json({
+      success: true,
       message: "Profile updated successfully",
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
+        role: user.role,
         picture: user.picture || null,
         googleId: user.googleId,
+        organization: user.organization || null,
         createdAt: user.createdAt,
       },
     });
   } catch (error) {
     console.error("Update profile error:", error.message);
-    return res.status(500).json({ message: "Failed to update profile" });
+    return res.status(500).json({ success: false, message: "Failed to update profile" });
   }
 };
 
+// Logout
 const logout = async (req, res) => {
   res.clearCookie("token", cookieOptions);
   res.clearCookie("temp_token", tempCookieOptions);
-  return res.status(200).json({ message: "Logged out successfully" });
+  return res.status(200).json({ success: true, message: "Logged out successfully" });
 };
 
 module.exports = {
   register,
+  resendVerificationOtp,
   login,
   getPendingUser,
   googleLogin,

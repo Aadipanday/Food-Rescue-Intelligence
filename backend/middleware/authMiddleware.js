@@ -1,14 +1,41 @@
-
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-// Fully authenticated routes: profile, /me, etc.
+// Extract JWT token from cookie or Authorization Bearer header
+const extractToken = (req) => {
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer ")
+  ) {
+    return req.headers.authorization.split(" ")[1];
+  }
+  return req.cookies?.token || req.headers["x-access-token"] || null;
+};
+
+// Extract temporary verification token from cookie, header, or body
+const extractTempToken = (req) => {
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer ")
+  ) {
+    return req.headers.authorization.split(" ")[1];
+  }
+  return (
+    req.cookies?.temp_token ||
+    req.headers["x-temp-token"] ||
+    req.body?.tempToken ||
+    null
+  );
+};
+
+// Fully authenticated routes: profile, /me, listings, organizations, etc.
 const protect = async (req, res, next) => {
   try {
-    const token = req.cookies?.token;
+    const token = extractToken(req);
 
     if (!token) {
       return res.status(401).json({
+        success: false,
         message: "Please log in to continue",
       });
     }
@@ -16,9 +43,12 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Never allow a temporary OTP token as a full login session.
-    if (decoded.stage === "2fa_pending" ||
-        decoded.stage === "email_registration_pending") {
+    if (
+      decoded.stage === "2fa_pending" ||
+      decoded.stage === "email_registration_pending"
+    ) {
       return res.status(401).json({
+        success: false,
         message: "Please complete verification first",
       });
     }
@@ -27,6 +57,7 @@ const protect = async (req, res, next) => {
 
     if (!user) {
       return res.status(401).json({
+        success: false,
         message: "User account not found",
       });
     }
@@ -35,22 +66,21 @@ const protect = async (req, res, next) => {
     return next();
   } catch (error) {
     return res.status(401).json({
+      success: false,
       message: "Invalid or expired session. Please log in again.",
     });
   }
 };
 
-// Temporary routes: pending-user and login OTP verification
+// Temporary routes: pending-user and registration/login OTP verification
 const protectPending = async (req, res, next) => {
   try {
-    const token =
-      req.cookies?.temp_token ||
-      req.headers["x-temp-token"] ||
-      req.body?.tempToken;
+    const token = extractTempToken(req);
 
     if (!token) {
       return res.status(401).json({
-        message: "Verification session expired. Please log in again.",
+        success: false,
+        message: "Verification session expired. Please request a new OTP.",
       });
     }
 
@@ -60,6 +90,7 @@ const protectPending = async (req, res, next) => {
       !["2fa_pending", "email_registration_pending"].includes(decoded.stage)
     ) {
       return res.status(401).json({
+        success: false,
         message: "Invalid verification session",
       });
     }
@@ -68,6 +99,7 @@ const protectPending = async (req, res, next) => {
 
     if (!user) {
       return res.status(401).json({
+        success: false,
         message: "User account not found",
       });
     }
@@ -78,12 +110,39 @@ const protectPending = async (req, res, next) => {
     return next();
   } catch (error) {
     return res.status(401).json({
-      message: "Verification session expired. Please try again.",
+      success: false,
+      message: "Verification session expired. Please request a new OTP.",
     });
   }
+};
+
+// Role-based authorization middleware
+const restrictTo = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    const userRole = (req.user.role || "").toUpperCase();
+    const normalizedRoles = roles.map((r) => r.toUpperCase());
+
+    // Admin always has access to all resources
+    if (userRole === "ADMIN" || normalizedRoles.includes(userRole)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: `Access denied. Role '${req.user.role}' is not authorized. Requires: ${roles.join(", ")}`,
+    });
+  };
 };
 
 module.exports = {
   protect,
   protectPending,
+  restrictTo,
 };
