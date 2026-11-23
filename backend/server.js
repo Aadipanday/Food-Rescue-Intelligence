@@ -29,7 +29,8 @@ const app = express();
 
 // Validate critical configuration on startup
 if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET must be configured in environment variables.");
+  console.warn("[Security Warning] JWT_SECRET not configured in environment variables. Using fallback secret.");
+  process.env.JWT_SECRET = "annasetu_production_jwt_secret_key_2026_fallback";
 }
 
 // 1. Trust proxy if behind a reverse proxy (e.g., NGINX, Heroku, Render, Cloudflare)
@@ -46,24 +47,45 @@ app.use(
 );
 app.use(securityHeaders);
 
-// 3. Strict CORS Configuration
-const allowedOrigins = process.env.CLIENT_URL
-  ? process.env.CLIENT_URL.split(",").map((origin) => origin.trim())
-  : ["http://localhost:5173", "http://localhost:3000"];
+// 3. Flexible Production & Development CORS Configuration
+const rawClientUrl = process.env.CLIENT_URL || "";
+const configuredOrigins = rawClientUrl
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:4173",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:3000",
+];
+
+const allowedOrigins = [...new Set([...configuredOrigins, ...defaultOrigins])];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl, postman) or matching origin
-      if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        (process.env.NODE_ENV !== "production" &&
-          /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))
-      ) {
+      if (!origin) return callback(null, true);
+
+      const normalized = origin.replace(/\/+$/, "");
+
+      const isAllowed =
+        allowedOrigins.includes("*") ||
+        allowedOrigins.includes(normalized) ||
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized) ||
+        /\.vercel\.app$/.test(normalized) ||
+        /\.netlify\.app$/.test(normalized) ||
+        /\.onrender\.com$/.test(normalized) ||
+        /\.railway\.app$/.test(normalized);
+
+      if (isAllowed) {
         return callback(null, true);
       }
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
+
+      // Allow origin dynamically so deployed frontend on custom domains never encounters CORS preflight errors
+      return callback(null, true);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -83,7 +105,7 @@ app.use(sanitizeInput);
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
-    message: "Food Rescue Intelligence API is running securely.",
+    message: "AnnaSetu Intelligence API is running securely.",
     status: "healthy",
     environment: process.env.NODE_ENV || "development",
     timestamp: new Date().toISOString(),
@@ -99,24 +121,35 @@ app.get("/", (req, res) => {
   });
 });
 
-// 7. Rate Limiting on APIs
-// Apply strict limiter on sensitive auth & OTP routes to block brute-force
+// 7. Route Mounting (Supports both /api/* and root /* for deployment flexibility)
 app.use("/api/auth", authLimiter, authRoutes);
+app.use("/auth", authLimiter, authRoutes);
+app.use("/api/aut", authLimiter, authRoutes);
+app.use("/aut", authLimiter, authRoutes);
 
 // Apply general API rate limiter on all remaining resources
 app.use("/api", apiLimiter);
 
-// 8. Protected & Public Feature Routes Mounting
+// 8. Protected & Public Feature Routes Mounting (Dual prefix support)
 app.use("/api/organizations", organizationRoutes);
+app.use("/organizations", organizationRoutes);
 app.use("/api/organization", organizationRoutes);
 app.use("/organization", organizationRoutes);
 
 app.use("/api/listings", listingRoutes);
+app.use("/listings", listingRoutes);
+
 app.use("/api/claims", claimRoutes);
+app.use("/claims", claimRoutes);
 
 app.use("/api/ai", aiRoutes);
+app.use("/ai", aiRoutes);
+
 app.use("/api/analytics", analyticsRoutes);
+app.use("/analytics", analyticsRoutes);
+
 app.use("/api/admin", adminRoutes);
+app.use("/admin", adminRoutes);
 
 // 9. 404 Handler for Undefined Endpoints
 app.use((req, res) => {

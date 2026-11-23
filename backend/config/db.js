@@ -42,21 +42,38 @@ const customLookup = (hostname, options, callback) => {
 };
 
 const connectDB = async () => {
+  const uri = process.env.MONGO_URI;
+  if (!uri) {
+    console.error("[MongoDB Error] MONGO_URI is not defined in environment variables!");
+    return;
+  }
+
+  // Attempt 1: Standard Mongoose connection (Ideal for cloud deployment on Render, Railway, Vercel)
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI, {
-      lookup: customLookup,
-      maxPoolSize: 10, // Maintain up to 10 socket connections
-      minPoolSize: 2,  // Keep at least 2 connections open
-      serverSelectionTimeoutMS: 10000, // Keep trying to send operations for 10s
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+    const conn = await mongoose.connect(uri, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 15000,
+      socketTimeoutMS: 45000,
     });
 
     console.log(`[MongoDB] Connected successfully to host: ${conn.connection.host}`);
-  } catch (error) {
-    console.error("[MongoDB Error] Connection failed:", error.message);
-    if (process.env.NODE_ENV === "production") {
-      process.exit(1);
-    } else {
+    return conn;
+  } catch (standardError) {
+    console.warn("[MongoDB Notice] Standard connection failed, attempting with custom DNS resolver...", standardError.message);
+
+    // Attempt 2: Custom DNS resolver (Fallback for local ISP DNS sinkholing)
+    try {
+      const conn = await mongoose.connect(uri, {
+        lookup: customLookup,
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
+      });
+
+      console.log(`[MongoDB] Connected with custom DNS fallback to host: ${conn.connection.host}`);
+      return conn;
+    } catch (fallbackError) {
+      console.error("[MongoDB Error] Connection failed on all attempts:", fallbackError.message);
       console.warn("\n=======================================================");
       console.warn("[MongoDB Notice] Database connection is pending/offline.");
       console.warn("  • If using local MongoDB: Ensure service is running ('net start MongoDB' or 'mongod')");

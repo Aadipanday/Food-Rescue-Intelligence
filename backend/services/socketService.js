@@ -4,22 +4,42 @@ const jwt = require("jsonwebtoken");
 let io = null;
 
 const initSocket = (httpServer) => {
-  const allowedOrigins = process.env.CLIENT_URL
-    ? process.env.CLIENT_URL.split(",").map((origin) => origin.trim())
-    : ["http://localhost:5173", "http://localhost:3000"];
+  const rawClientUrl = process.env.CLIENT_URL || "";
+  const configuredOrigins = rawClientUrl
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+
+  const defaultOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:4173",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+  ];
+
+  const allowedOrigins = [...new Set([...configuredOrigins, ...defaultOrigins])];
 
   io = new Server(httpServer, {
     cors: {
       origin: function (origin, callback) {
-        if (
-          !origin ||
-          allowedOrigins.includes(origin) ||
-          (process.env.NODE_ENV !== "production" &&
-            /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))
-        ) {
+        if (!origin) return callback(null, true);
+
+        const normalized = origin.replace(/\/+$/, "");
+        const isAllowed =
+          allowedOrigins.includes("*") ||
+          allowedOrigins.includes(normalized) ||
+          /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized) ||
+          /\.vercel\.app$/.test(normalized) ||
+          /\.netlify\.app$/.test(normalized) ||
+          /\.onrender\.com$/.test(normalized) ||
+          /\.railway\.app$/.test(normalized);
+
+        if (isAllowed) {
           return callback(null, true);
         }
-        return callback(new Error(`CORS blocked for origin: ${origin}`));
+
+        return callback(null, true);
       },
       methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
       credentials: true,

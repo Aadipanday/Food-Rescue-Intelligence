@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "Smart Surplus Food Redistribution & NGO Coordination Platform",
   "scripts": {
+    "start": "node backend/server.js",
+    "start:backend": "npm --prefix backend start",
     "dev:frontend": "npm --prefix frontend run dev",
     "dev:backend": "npm --prefix backend run dev",
     "build:frontend": "npm --prefix frontend run build",

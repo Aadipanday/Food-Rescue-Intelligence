@@ -1,7 +1,19 @@
 import axios from 'axios';
 
+// Get base URL from environment or default to local backend
+let rawBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').trim();
+
+// Strip any trailing slash
+rawBaseUrl = rawBaseUrl.replace(/\/+$/, '');
+
+// If the configured URL does not end with /api, append it automatically
+// (Prevents 404 when developers configure VITE_API_URL="https://annasetu.onrender.com" without /api)
+if (!rawBaseUrl.endsWith('/api')) {
+  rawBaseUrl = `${rawBaseUrl}/api`;
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: rawBaseUrl,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
