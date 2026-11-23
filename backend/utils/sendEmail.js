@@ -17,7 +17,7 @@ const sendEmail = async ({ to, subject, html }) => {
     "https://api.brevo.com/v3/smtp/email",
     {
       sender: {
-        name: process.env.BREVO_SENDER_NAME || "FoodRescue Intelligence",
+        name: process.env.BREVO_SENDER_NAME || "AnnaSetu Intelligence",
         email: process.env.BREVO_SENDER_EMAIL,
       },
       to: [{ email: to }],

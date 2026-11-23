@@ -367,7 +367,7 @@ export default function RescueTracker() {
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-400/30">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Live Food Rescue Network</span>
+              <span>Live AnnaSetu Network</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1.5">
               Food Delivery & Rescue Status

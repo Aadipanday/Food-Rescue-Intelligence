@@ -586,7 +586,7 @@ const Register = () => {
 
         {/* Footer Link */}
         <div className="pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
-          <span>Already registered with Food Rescue Intelligence? </span>
+          <span>Already registered with AnnaSetu Intelligence? </span>
           <Link to="/login" className="font-semibold text-emerald-600 hover:text-emerald-700">
             Sign In Here
           </Link>

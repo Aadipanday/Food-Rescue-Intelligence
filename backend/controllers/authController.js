@@ -39,7 +39,7 @@ function escapeHtml(value = "") {
 
 const sendOtpEmail = async (user, otp, purpose) => {
   const isRegistration = purpose === "register";
-  const brandName = process.env.BREVO_SENDER_NAME || "Anansetu Food Rescue";
+  const brandName = process.env.BREVO_SENDER_NAME || "AnnaSetu Intelligence";
 
   await sendEmail({
     to: user.email,

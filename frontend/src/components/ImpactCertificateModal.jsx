@@ -34,7 +34,7 @@ const ImpactCertificateModal = ({ listing, onClose }) => {
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 print:hidden">
           <div className="flex items-center gap-2 text-emerald-700">
             <Award className="w-5 h-5" />
-            <span className="font-bold text-sm">Official Food Rescue Certificate</span>
+            <span className="font-bold text-sm">Official AnnaSetu Certificate</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -66,7 +66,7 @@ const ImpactCertificateModal = ({ listing, onClose }) => {
               Certificate of Verified Food Rescue & Redistribution
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Food Rescue Intelligence (FRI)
+              AnnaSetu Intelligence
             </h2>
             <p className="text-xs text-slate-500">IET Lucknow CSE Group No. 15 • Zero Waste Protocol</p>
           </div>

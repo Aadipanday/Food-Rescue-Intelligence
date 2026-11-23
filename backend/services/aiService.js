@@ -1,5 +1,5 @@
 /**
- * Food Rescue Intelligence - AI Service Engine
+ * AnnaSetu Intelligence - AI Service Engine
  * Provides smart analytics, urgency scoring, NGO matching, and environmental impact computation.
  */
 
@@ -254,7 +254,7 @@ const analyzeFoodImageWithGemini = async ({ imageBase64, mimeType = "image/jpeg"
   }
 
   if (apiKey) {
-    const promptText = `You are a certified senior Food Safety & Rescue Inspector for the 'Food Rescue Intelligence' zero-hunger network.
+    const promptText = `You are a certified senior Food Safety & Rescue Inspector for the 'AnnaSetu Intelligence' zero-hunger network.
 Analyze this food photograph with rigorous accuracy.
 
 CRITICAL CLASSIFICATION & PERISHABILITY RULES:

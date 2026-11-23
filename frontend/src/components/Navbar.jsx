@@ -34,9 +34,9 @@ export default function Navbar() {
   return (
     <header className="site-header">
       <div className="site-container header-content">
-        <Link to="/" className="brand" aria-label="Food Rescue Intelligence home">
+        <Link to="/" className="brand" aria-label="AnnaSetu Intelligence home">
           <span className="brand-symbol"><HeartHandshake size={23} strokeWidth={2} /></span>
-          <span className="brand-wordmark">food<span>rescue</span><small>INTELLIGENCE</small></span>
+          <span className="brand-wordmark">Anna<span>Setu</span><small>INTELLIGENCE</small></span>
         </Link>
         <nav className="desktop-navigation" aria-label="Main navigation">
           {navigation.map(({ to, label, end }) => <NavLink key={to} to={to} end={end} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>{label}</NavLink>)}

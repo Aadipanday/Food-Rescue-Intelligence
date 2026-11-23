@@ -23,7 +23,7 @@ export default function Footer() {
             <span className="footer-logo-icon">
               <HeartHandshake size={22} />
             </span>
-            <span>food<strong>rescue</strong></span>
+            <span>Anna<strong>Setu</strong></span>
           </Link>
           <p>
             Making it easier for good food to find its way to the people who need it. Less waste, more community.
@@ -83,7 +83,7 @@ export default function Footer() {
       </div>
 
       <div className="site-container footer-bottom">
-        <span>© {new Date().getFullYear()} Food Rescue Intelligence. All rights reserved.</span>
+        <span>© {new Date().getFullYear()} AnnaSetu Intelligence. All rights reserved.</span>
         <span>Created at Institute of Engineering & Technology, Lucknow · Group 15</span>
       </div>
     </footer>

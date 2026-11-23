@@ -1,4 +1,4 @@
-# 🍲 Food Rescue Intelligence (FRI)
+# 🍲 AnnaSetu Intelligence
 > **A Smart Surplus Food Redistribution & NGO Coordination Platform**  
 > *Academic Project — Department of Computer Science & Engineering, IET Lucknow (Group No. 15)*
 
@@ -8,7 +8,7 @@
 
 Every day, vast amounts of edible cooked food from university canteens, college messes, banquet halls, and restaurants are discarded due to volatile daily attendance and narrow safe consumption windows (4–6 hours). Meanwhile, millions suffer from food insecurity.
 
-**Food Rescue Intelligence (FRI)** is a real-time, authenticated web platform designed to eliminate communication latency and bridge food donors directly with verified NGOs, orphanages, and shelter homes before perishable food degrades.
+**AnnaSetu Intelligence** is a real-time, authenticated web platform designed to eliminate communication latency and bridge food donors directly with verified NGOs, orphanages, and shelter homes before perishable food degrades.
 
 ---
 
