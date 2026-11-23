@@ -141,8 +141,30 @@ const restrictTo = (...roles) => {
   };
 };
 
+// Optional authentication middleware - attaches req.user if valid token provided, but allows unauthenticated access
+const optionalAuth = async (req, res, next) => {
+  try {
+    const token = extractToken(req);
+    if (!token) {
+      return next();
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded && decoded.userId) {
+      const user = await User.findById(decoded.userId).select("-password");
+      if (user) {
+        req.user = user;
+      }
+    }
+  } catch (error) {
+    // Continue unauthenticated on invalid/expired token
+  }
+  return next();
+};
+
 module.exports = {
   protect,
   protectPending,
   restrictTo,
+  optionalAuth,
 };

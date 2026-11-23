@@ -43,19 +43,24 @@ const getPlatformImpact = async (req, res) => {
       totalWaterSavedLiters: 0,
     };
 
+    const impactData = {
+      totalMealsRescued: stats.totalMeals,
+      totalKgSaved: Math.round(stats.totalMeals * 0.4),
+      totalCo2SavedKg: Math.round(stats.totalCo2eSavedKg * 10) / 10,
+      totalCo2eSavedKg: Math.round(stats.totalCo2eSavedKg * 10) / 10,
+      totalCo2eSavedTonnes: Math.round((stats.totalCo2eSavedKg / 1000) * 100) / 100,
+      totalWaterSavedLiters: Math.round(stats.totalWaterSavedLiters),
+      completedRescuesCount: completedRescues,
+      activeListingsCount: activeListings,
+      totalListingsCount: totalListings,
+      registeredNgosCount: totalNgos,
+      registeredFoodProvidersCount: totalProviders,
+    };
+
     return res.status(200).json({
       success: true,
-      impact: {
-        totalMealsRescued: stats.totalMeals,
-        totalCo2eSavedKg: Math.round(stats.totalCo2eSavedKg * 10) / 10,
-        totalCo2eSavedTonnes: Math.round((stats.totalCo2eSavedKg / 1000) * 100) / 100,
-        totalWaterSavedLiters: Math.round(stats.totalWaterSavedLiters),
-        completedRescuesCount: completedRescues,
-        activeListingsCount: activeListings,
-        totalListingsCount: totalListings,
-        registeredNgosCount: totalNgos,
-        registeredFoodProvidersCount: totalProviders,
-      },
+      impact: impactData,
+      data: impactData,
     });
   } catch (error) {
     console.error("Platform impact error:", error);
@@ -88,15 +93,20 @@ const getUserImpact = async (req, res) => {
       totalWaterSavedLiters += listing.aiAnalysis?.waterSavedLiters || 0;
     });
 
+    const impactStats = {
+      role: req.user.role,
+      completedRescues: completed.length,
+      totalMealsFed: totalMeals,
+      totalMealsRescued: totalMeals,
+      totalCo2eSavedKg: Math.round(totalCo2eSavedKg * 10) / 10,
+      totalWaterSavedLiters: Math.round(totalWaterSavedLiters),
+    };
+
     return res.status(200).json({
       success: true,
-      personalImpact: {
-        role: req.user.role,
-        completedRescues: completed.length,
-        totalMealsFed: totalMeals,
-        totalCo2eSavedKg: Math.round(totalCo2eSavedKg * 10) / 10,
-        totalWaterSavedLiters: Math.round(totalWaterSavedLiters),
-      },
+      personalImpact: impactStats,
+      impact: impactStats,
+      data: impactStats,
     });
   } catch (error) {
     console.error("User impact error:", error);

@@ -1,0 +1,22 @@
+{
+  "name": "food-rescue-intelligence",
+  "version": "1.0.0",
+  "description": "Smart Surplus Food Redistribution & NGO Coordination Platform",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "seed:backend": "npm --prefix backend run seed"
+  },
+  "keywords": [
+    "food-rescue",
+    "zero-hunger",
+    "react",
+    "vite",
+    "tailwind",
+    "express",
+    "mongodb"
+  ],
+  "author": "Group 15 (IET Lucknow)",
+  "license": "ISC"
+}

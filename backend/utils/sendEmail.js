@@ -6,6 +6,10 @@ const sendEmail = async ({ to, subject, html }) => {
     !process.env.BREVO_API_KEY ||
     !process.env.BREVO_SENDER_EMAIL
   ) {
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`\n========================================\n[DEV EMAIL SIMULATION]\nTo: ${to}\nSubject: ${subject}\nContent: ${html.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim()}\n========================================\n`);
+      return { messageId: "dev-simulated-email" };
+    }
     throw new Error("Brevo environment variables are missing");
   }
 

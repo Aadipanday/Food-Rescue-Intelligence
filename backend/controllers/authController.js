@@ -39,27 +39,31 @@ function escapeHtml(value = "") {
 
 const sendOtpEmail = async (user, otp, purpose) => {
   const isRegistration = purpose === "register";
+  const brandName = process.env.BREVO_SENDER_NAME || "Anansetu Food Rescue";
 
   await sendEmail({
     to: user.email,
     subject: isRegistration
-      ? "Verify your FoodRescue Intelligence account"
-      : "Your FoodRescue Intelligence login OTP",
+      ? `Verify your ${brandName} account`
+      : `Your ${brandName} login OTP`,
     html: `
-      <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e0e0e0;border-radius:8px">
-        <h2 style="color:#2e7d32">FoodRescue Intelligence</h2>
-        <p>Hello <strong>${escapeHtml(user.name)}</strong>,</p>
-        <p>${
-          isRegistration
-            ? "Thank you for joining FoodRescue Intelligence! Use this OTP to verify your email address:"
-            : "Use this OTP to complete your login:"
-        }</p>
-        <div style="text-align:center;margin:24px 0">
-          <span style="font-size:32px;font-weight:bold;letter-spacing:8px;background:#f1f8e9;color:#2e7d32;padding:12px 24px;border-radius:6px;display:inline-block">${otp}</span>
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;padding:24px;border:1px solid #e0e0e0;border-radius:12px;background:#ffffff">
+        <div style="text-align:center;margin-bottom:20px">
+          <h2 style="color:#166534;margin:0;font-size:24px">${brandName}</h2>
+          <p style="color:#64748b;font-size:13px;margin:4px 0 0 0">Surplus Food Redistribution & Zero-Hunger Network</p>
         </div>
-        <p style="color:#666">This OTP expires in 10 minutes. Do not share it with anyone.</p>
-        <hr style="border:none;border-top:1px solid #eee;margin:20px 0" />
-        <p style="font-size:12px;color:#999">FoodRescue Intelligence — Saving food, feeding lives, reducing waste.</p>
+        <p style="font-size:15px;color:#334155">Hello <strong>${escapeHtml(user.name)}</strong>,</p>
+        <p style="font-size:14px;color:#475569;line-height:1.6">${
+          isRegistration
+            ? "Thank you for joining our community! Use this secure 6-digit OTP code to verify your email address and activate your account:"
+            : "Use this secure 6-digit OTP code to complete your two-factor login:"
+        }</p>
+        <div style="text-align:center;margin:28px 0">
+          <span style="font-size:36px;font-weight:bold;letter-spacing:10px;background:#f0fdf4;color:#15803d;padding:14px 28px;border-radius:10px;display:inline-block;border:1px solid #bbf7d0">${otp}</span>
+        </div>
+        <p style="font-size:13px;color:#64748b;text-align:center">This OTP is valid for <strong>10 minutes</strong>. Never share this code with anyone.</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0" />
+        <p style="font-size:12px;color:#94a3b8;text-align:center">${brandName} — Saving food, feeding lives, reducing waste.</p>
       </div>
     `,
   });
@@ -132,6 +136,7 @@ const register = async (req, res) => {
         message: "An unverified registration was found. A fresh verification OTP has been sent to your email.",
         requiresEmailVerification: true,
         tempToken,
+        devOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
         user: {
           id: existingUser._id,
           name: existingUser.name,
@@ -175,6 +180,7 @@ const register = async (req, res) => {
       message: "Registration successful. Please enter the OTP sent to your email.",
       requiresEmailVerification: true,
       tempToken,
+      devOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
       user: {
         id: user._id,
         name: user.name,
@@ -232,6 +238,7 @@ const resendVerificationOtp = async (req, res) => {
       success: true,
       message: "Verification OTP resent to your email.",
       tempToken,
+      devOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
     });
   } catch (error) {
     console.error("Resend OTP error:", error.message);
@@ -282,34 +289,38 @@ const login = async (req, res) => {
       const tempToken = makeTempToken(user._id, "email_registration_pending");
       res.cookie("temp_token", tempToken, tempCookieOptions);
 
-      return res.status(403).json({
+      return res.status(200).json({
         success: false,
-        message: "Your email is not verified yet. A new verification OTP has been sent to your email.",
+        message: "Your email is not verified yet. A verification OTP has been sent to your email.",
         requiresEmailVerification: true,
         tempToken,
+        devOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
         user: {
           id: user._id,
           name: user.name,
           email: user.email,
+          role: user.role,
         },
       });
     }
 
-    // User is verified: initiate 2FA OTP flow
-    const tempToken = makeTempToken(user._id, "2fa_pending");
-    res.cookie("temp_token", tempToken, tempCookieOptions);
+    // User is verified: issue authenticated JWT session token!
+    const token = generateToken(user._id);
+    res.cookie("token", token, cookieOptions);
+    res.clearCookie("temp_token", tempCookieOptions);
 
     return res.status(200).json({
       success: true,
-      message: "Password verified. Complete two-step verification via Email OTP or SMS OTP.",
-      requiresOtp: true,
-      tempToken,
+      message: "Login successful",
+      token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
+        organization: user.organization || null,
+        isEmailVerified: user.isEmailVerified,
       },
     });
   } catch (error) {
@@ -557,7 +568,7 @@ const verifyPhoneOtp = async (req, res) => {
 // Google OAuth Login
 const googleLogin = async (req, res) => {
   try {
-    const { credential } = req.body;
+    const { credential, role } = req.body;
 
     if (!credential) {
       return res.status(400).json({ success: false, message: "Google credential is required" });
@@ -583,18 +594,12 @@ const googleLogin = async (req, res) => {
     });
 
     if (user) {
-      if (!user.googleId && user.password) {
-        return res.status(409).json({
-          success: false,
-          message: "An email/password account already exists. Log in with password first.",
-          accountLinkRequired: true,
-        });
-      }
-
+      // Seamlessly link Google ID if not yet linked
       if (!user.googleId) user.googleId = payload.sub;
       user.isEmailVerified = true;
-      if (payload.name) user.name = payload.name;
+      if (payload.name && !user.name) user.name = payload.name;
       if (payload.picture) user.picture = payload.picture;
+      if (role && (!user.role || user.role === "user")) user.role = role;
       await user.save();
     } else {
       user = await User.create({
@@ -604,7 +609,7 @@ const googleLogin = async (req, res) => {
         googleId: payload.sub,
         picture: payload.picture || null,
         isEmailVerified: true,
-        role: "user",
+        role: role || "donor",
       });
     }
 

@@ -62,32 +62,24 @@ flowchart TD
 
 ## 🛠️ Tech Stack
 
-* **Frontend:** React.js, Tailwind CSS
+* **Frontend:** React.js 18, Vite 5, Tailwind CSS, Lucide React, Axios, React Router DOM v6
 * **Backend:** Node.js, Express.js (REST API Architecture)
 * **Database:** MongoDB Atlas (Mongoose ODM with `2dsphere` indexes)
 * **Authentication:** JWT, Bcrypt.js, Google OAuth 2.0 (`google-auth-library`), Nodemailer
-* **Intelligence Layer:** LangChain & LLM APIs for unstructured extraction, Haversine formula for spatial distance
+* **Intelligence Layer:** Rule-based shelf-life urgency scoring, Haversine formula for spatial distance, CO₂ & water ROI calculations
 
 ---
 
-## 📋 API Endpoints Summary
+## 💻 Frontend Application Structure
 
-### Authentication (`/api/auth`)
-* `POST /api/auth/register` — Register new user & trigger Email OTP
-* `POST /api/auth/verify-email-otp` — Verify registration or login Email OTP
-* `POST /api/auth/login` — Password check & trigger 2FA OTP
-* `POST /api/auth/send-phone-otp` — Dispatch SMS OTP
-* `POST /api/auth/verify-phone-otp` — Verify SMS OTP & issue JWT
-* `POST /api/auth/google` — Google OAuth authentication
-* `GET  /api/auth/me` — Fetch authenticated user profile
-* `PUT  /api/auth/profile` — Update user details, role, and address
-* `POST /api/auth/logout` — Clear session cookies
+The user interface is structured with modern, responsive single-page architecture:
 
-### Organization (`/api/organizations`)
-* `POST /api/organizations` — Register canteen/restaurant or NGO profile with coordinates
-* `GET  /api/organizations/me` — Get current user's organization profile
-* `PUT  /api/organizations/me` — Update organization information and GPS coordinates
-* `GET  /api/organizations/:id` — View public organization profile
+* **🏠 Landing Page (`/`):** Live impact metrics counter (meals saved, kg diverted, CO₂ cut), 4-step workflow explainer, urgent food teaser, and interactive **Eco-Savings ROI Calculator**.
+* **🍱 Surplus Food Feed (`/feed`):** Public browse with real-time filters (category, dietary type, urgency level) and 1-click **Claim for Shelter** modal.
+* **🔑 Authentication (`/login`, `/register`):** Role-specific login with 2FA OTP verification, **1-click Demo Fill buttons**, and browser GPS geolocation auto-detection.
+* **📦 Donor Dashboard (`/donor`):** Surplus batch posting with instant AI urgency & impact preview, active listing tracker, and **Handover OTP Verification Modal**.
+* **🤝 NGO Shelter Dashboard (`/ngo`):** Nearby canteen surplus batches, active claims view with large **4-digit Handshake OTP** display for drivers, and pickup history.
+* **⚡ Admin Control Console (`/admin`):** Platform governance, pending organization license approvals, and user account role management.
 
 ---
 
@@ -102,22 +94,26 @@ flowchart TD
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/Aadipanday/Food-Rescue-Intelligence.git
-   cd Food-Rescue-Intelligence/backend
+   cd Food-Rescue-Intelligence
    ```
 
 2. **Install dependencies:**
    ```bash
-   npm install
+   # Install backend dependencies
+   cd backend && npm install
+
+   # Install frontend dependencies
+   cd ../frontend && npm install
    ```
 
 3. **Configure Environment Variables:**
-   Create a `.env` file inside the `backend/` directory:
+   Create a `.env` file inside the `backend/` directory (refer to `backend/.env.example`):
    ```env
    PORT=5000
    NODE_ENV=development
-   CLIENT_URL=http://localhost:5173
-   MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/food-rescue
-   JWT_SECRET=your_jwt_secret_key_here
+   CLIENT_URL=http://localhost:5173,http://localhost:3000
+   MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/food_rescue_intelligence
+   JWT_SECRET=super_secret_production_jwt_key_min_32_characters_long
    GOOGLE_CLIENT_ID=your_google_client_id_here
    EMAIL_HOST=smtp.gmail.com
    EMAIL_PORT=587
@@ -125,11 +121,40 @@ flowchart TD
    EMAIL_PASS=your_app_password
    ```
 
-4. **Run the development server:**
+4. **Seed Database with Sample Organizations & Donations:**
    ```bash
-   npm run dev
+   cd backend
+   npm run seed
    ```
-   The backend API will run on `http://localhost:5000`.
+
+5. **Run the Development Servers:**
+   * **Backend API (Port 5000):**
+     ```bash
+     cd backend
+     npm run dev
+     ```
+   * **Frontend Web App (Port 5173):**
+     ```bash
+     cd frontend
+     npm run dev
+     ```
+   * Or from the root directory:
+     ```bash
+     npm run dev:backend
+     npm run dev:frontend
+     ```
+
+---
+
+## 🧪 Demo Credentials (For Evaluation & Testing)
+
+| Role | Email | Password | Pre-seeded Facility |
+| :--- | :--- | :--- | :--- |
+| **Donor (Canteen)** | `canteen@ietlucknow.ac.in` | `Password123!` | IET Central Canteen (Lucknow) |
+| **NGO (Shelter)** | `helpinghands@ngo.org` | `Password123!` | Helping Hands Orphanage & Shelter |
+| **System Admin** | `admin@foodrescue.org` | `Password123!` | FRI Operations Console |
+
+*(Note: The login page includes 1-click **Quick Demo Sign-In** buttons to test each role instantly without manual typing).*
 
 ---
 

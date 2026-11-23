@@ -23,6 +23,7 @@ const foodListingSchema = new mongoose.Schema(
         "PACKAGED_FOOD",
         "DAIRY",
         "FRUITS_VEGETABLES",
+        "RAW_PRODUCE",
         "BEVERAGES",
         "OTHER",
       ],
@@ -73,8 +74,33 @@ const foodListingSchema = new mongoose.Schema(
 
     storageCondition: {
       type: String,
-      enum: ["ROOM_TEMPERATURE", "REFRIGERATED", "FROZEN", "HEATED"],
       default: "ROOM_TEMPERATURE",
+    },
+
+    packagingType: {
+      type: String,
+      enum: ["INDIVIDUAL_BOXES", "BULK_VESSELS", "SEALED_PACKETS", "DRY_SACKS", "UNPACKED"],
+      default: "BULK_VESSELS",
+    },
+
+    handlingInstructions: {
+      type: String,
+      default: "",
+    },
+
+    allergens: {
+      type: [String],
+      default: [],
+    },
+
+    pickupPoint: {
+      type: String,
+      default: "",
+    },
+
+    contactPerson: {
+      type: String,
+      default: "",
     },
 
     urgencyLevel: {
@@ -119,6 +145,8 @@ const foodListingSchema = new mongoose.Schema(
       enum: [
         "AVAILABLE",
         "CLAIMED",
+        "ACCEPTED",
+        "IN_TRANSIT",
         "PICKED_UP",
         "COMPLETED",
         "EXPIRED",

@@ -87,9 +87,15 @@ const registerOrganization = async (req, res) => {
 // 2. Get logged-in user's organization
 const getMyOrganization = async (req, res) => {
   try {
-    const organization = await Organization.findOne({
-      owner: req.user._id,
-    }).populate("owner", "name email phone picture");
+    const query = { $or: [{ owner: req.user._id }] };
+    if (req.user.organization) {
+      query.$or.push({ _id: req.user.organization });
+    }
+
+    const organization = await Organization.findOne(query).populate(
+      "owner",
+      "name email phone picture"
+    );
 
     if (!organization) {
       return res.status(404).json({
@@ -142,17 +148,29 @@ const updateOrganization = async (req, res) => {
       });
     }
 
-    const organization = await Organization.findOneAndUpdate(
-      { owner: req.user._id },
+    const query = { $or: [{ owner: req.user._id }] };
+    if (req.user.organization) {
+      query.$or.push({ _id: req.user.organization });
+    }
+
+    let organization = await Organization.findOneAndUpdate(
+      query,
       { $set: updates },
       { new: true, runValidators: true }
     );
 
     if (!organization) {
-      return res.status(404).json({
-        success: false,
-        message: "Organization not found",
+      // Auto-create facility record if not existing yet
+      const userRole = (req.user.role || "").toLowerCase();
+      const orgType = ["ngo", "recipient"].includes(userRole) ? "NGO" : "FOOD_PROVIDER";
+      organization = await Organization.create({
+        owner: req.user._id,
+        type: orgType,
+        name: updates.name || `${req.user.name || "Community"}'s Hub`,
+        ...updates,
       });
+      req.user.organization = organization._id;
+      await req.user.save();
     }
 
     return res.status(200).json({

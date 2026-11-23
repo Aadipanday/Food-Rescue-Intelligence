@@ -58,6 +58,7 @@ const foodClaimSchema = new mongoose.Schema(
       enum: [
         "REQUESTED",
         "ACCEPTED",
+        "IN_TRANSIT",
         "PICKED_UP",
         "COMPLETED",
         "REJECTED",
