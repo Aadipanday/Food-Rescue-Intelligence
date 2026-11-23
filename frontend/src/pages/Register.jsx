@@ -131,12 +131,7 @@ const Register = () => {
       if (res.data.requiresEmailVerification) {
         setVerifyingOtp(true);
         setTempToken(res.data.tempToken);
-        if (res.data.devOtp) {
-          setOtp(String(res.data.devOtp));
-          setSuccessMsg(`Account created! (Dev Mode: OTP auto-filled: ${res.data.devOtp})`);
-        } else {
-          setSuccessMsg(res.data.message || 'OTP sent to your email! Please enter it to complete registration.');
-        }
+        setSuccessMsg(res.data.message || 'OTP sent to your email! Please enter it to complete registration.');
         return;
       }
 
@@ -215,9 +210,6 @@ const Register = () => {
       const res = await api.post('/auth/resend-otp', { email: formData.email });
       setResending(false);
       setSuccessMsg(res.data?.message || 'Fresh OTP sent to your email.');
-      if (res.data?.devOtp) {
-        setOtp(String(res.data.devOtp));
-      }
       if (res.data?.tempToken) {
         setTempToken(res.data.tempToken);
       }

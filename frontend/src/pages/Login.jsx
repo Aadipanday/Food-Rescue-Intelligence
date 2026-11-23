@@ -76,10 +76,7 @@ const Login = () => {
     setLoading(false);
 
     if (res.requires2FA) {
-      setInfoMessage(res.message || 'Please enter the 6-digit verification code.');
-      if (res.devOtp) {
-        setOtp(String(res.devOtp));
-      }
+      setInfoMessage(res.message || 'Please enter the 6-digit verification code sent to your email.');
       return;
     }
 
@@ -116,9 +113,6 @@ const Login = () => {
       const res = await api.post('/auth/resend-otp', { email });
       setResending(false);
       setInfoMessage(res.data?.message || 'A fresh OTP has been sent to your email.');
-      if (res.data?.devOtp) {
-        setOtp(String(res.data.devOtp));
-      }
     } catch (err) {
       setResending(false);
       setError(err.response?.data?.message || 'Could not resend OTP. Please try again.');

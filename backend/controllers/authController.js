@@ -136,7 +136,6 @@ const register = async (req, res) => {
         message: "An unverified registration was found. A fresh verification OTP has been sent to your email.",
         requiresEmailVerification: true,
         tempToken,
-        devOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
         user: {
           id: existingUser._id,
           name: existingUser.name,
@@ -180,7 +179,6 @@ const register = async (req, res) => {
       message: "Registration successful. Please enter the OTP sent to your email.",
       requiresEmailVerification: true,
       tempToken,
-      devOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
       user: {
         id: user._id,
         name: user.name,
@@ -238,7 +236,6 @@ const resendVerificationOtp = async (req, res) => {
       success: true,
       message: "Verification OTP resent to your email.",
       tempToken,
-      devOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
     });
   } catch (error) {
     console.error("Resend OTP error:", error.message);
@@ -294,7 +291,6 @@ const login = async (req, res) => {
         message: "Your email is not verified yet. A verification OTP has been sent to your email.",
         requiresEmailVerification: true,
         tempToken,
-        devOtp: process.env.NODE_ENV !== "production" ? otp : undefined,
         user: {
           id: user._id,
           name: user.name,

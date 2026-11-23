@@ -68,7 +68,6 @@ export const AuthProvider = ({ children }) => {
           success: false,
           requires2FA: true,
           tempToken: data.tempToken,
-          devOtp: data.devOtp,
           message: data.message || 'Please enter the verification OTP sent to your email.',
         };
       }
@@ -89,7 +88,6 @@ export const AuthProvider = ({ children }) => {
           success: false,
           requires2FA: true,
           tempToken: errData.tempToken,
-          devOtp: errData.devOtp,
           message: errData.message || 'Your account needs verification. Please enter the OTP sent to your email.',
         };
       }
@@ -139,7 +137,6 @@ export const AuthProvider = ({ children }) => {
           success: true,
           requiresEmailVerification: true,
           tempToken: data.tempToken,
-          devOtp: data.devOtp,
           message: data.message,
         };
       }
