@@ -1,8 +1,8 @@
-
 const express = require("express");
 
 const {
   register,
+  resendVerificationOtp,
   login,
   getPendingUser,
   googleLogin,
@@ -23,6 +23,7 @@ const {
 const router = express.Router();
 
 router.post("/register", register);
+router.post("/resend-otp", resendVerificationOtp);
 router.post("/login", login);
 router.post("/google", googleLogin);
 

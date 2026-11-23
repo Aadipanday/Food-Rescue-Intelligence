@@ -1,1 +1,37 @@
-{"name":"backend","version":"1.0.0","description":"","main":"server.js","type":"commonjs","scripts":{"start":"node server.js","dev":"nodemon server.js"},"keywords":[],"author":"","license":"ISC","dependencies":{"axios":"^1.20.0","bcryptjs":"^3.0.3","cookie-parser":"^1.4.7","cors":"^2.8.6","dotenv":"^18.0.8","express":"^5.3.0","google-auth-library":"^11.3.1","jsonwebtoken":"^9.0.3","mongoose":"^9.11.2","nodemon":"^3.1.14"}}
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Production-grade backend for Food Rescue Intelligence platform",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node utils/seed.js"
+  },
+  "keywords": [
+    "food-rescue",
+    "zero-hunger",
+    "food-waste",
+    "express",
+    "mongodb",
+    "ai-matching"
+  ],
+  "author": "Group 15 (IET Lucknow)",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.5",
+    "google-auth-library": "^11.3.1",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.11.2",
+    "nodemon": "^3.1.14",
+    "socket.io": "^4.8.4"
+  }
+}
