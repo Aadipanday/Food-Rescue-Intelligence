@@ -12,6 +12,8 @@ Every day, vast amounts of edible cooked food from university canteens, college 
 
 ---
 
+Deployed Link: https://food-rescue-intelligence.onrender.com
+
 ## 🚀 Key Features
 
 * **🔐 Multi-Tier Secure Authentication:**
